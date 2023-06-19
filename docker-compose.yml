@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    ports:
+      - 3306:3306
+    container_name: app_db
+    restart: unless-stopped
+    tty: true
+    environment:
+      MYSQL_DATABASE: test_db
+      MYSQL_ROOT_PASSWORD: root
+    command: mysqld --character-set-server=utf8 --collation-server=utf8_unicode_ci
+    volumes:
+      - ./db:/var/lib/mysql
+    networks:
+      - app_network
+    healthcheck:
+      test: [ 'CMD', 'mysqladmin', 'ping','-p root' ]
+      retries: 3
+      timeout: 5s
+
+  nginx:
+    restart: unless-stopped
+    container_name: app_nginx
+    tty: true
+    depends_on:
+      - api
+      - client
+    build:
+      dockerfile: Dockerfile
+      context: "./nginx"
+    ports:
+      - "80:80"
+    networks:
+      - app_network
+
+  api:
+    restart: unless-stopped
+    container_name: app_api
+    tty: true
+    build:
+      dockerfile: Dockerfile
+      context: './api'
+    depends_on:
+      - db
+    volumes:
+      - /api/node_modules
+      - ./api:/api
+    ports:
+      - '3001:3000'
+    networks:
+      - app_network
+
+  client:
+    restart: unless-stopped
+    container_name: app_client
+    build:
+      dockerfile: Dockerfile
+      context: "./client"
+    depends_on:
+      - api
+    volumes:
+      - /client/node_modules
+      - ./client:/app
+    ports:
+      - "3000:3000"
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
